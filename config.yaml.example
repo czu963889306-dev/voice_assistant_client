@@ -1,0 +1,60 @@
+# 阿里云百炼单一 API Key 配置。请复制为 config.yaml 后填写 DASHSCOPE_API_KEY。
+DASHSCOPE_API_KEY: ""
+
+# 华北2（北京）默认地址；如果使用业务空间，可填写 BAILIAN_WORKSPACE_ID。
+BAILIAN_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+BAILIAN_TTS_URL: https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer
+BAILIAN_WORKSPACE_ID: ""
+BAILIAN_REGION: cn-beijing
+# 优先使用 IPv4，避免部分 IPv6 地址不通造成长时间连接等待。
+PREFER_IPV4: true
+HTTP_CONNECT_TIMEOUT_SECONDS: 5
+HTTP_READ_TIMEOUT_SECONDS: 30
+
+CHAT_MODEL: qwen-plus
+STT_MODEL: qwen3-asr-flash
+TTS_MODEL: cosyvoice-v3-flash
+TTS_VOICE: longanhuan_v3
+# 合成请求和音频下载各自的网络等待超时。
+TTS_TIMEOUT_SECONDS: 15
+VISION_MODEL: qwen3-vl-plus
+
+# 使用稳定声卡 ID，避免重启后 card 1/card 2 顺序变化。
+# 在 arecord -l / aplay -l 中确认方括号前的 ID，其他型号请相应修改。
+INPUT_DEVICE: plughw:CARD=UACDemoV10,DEV=0
+OUTPUT_DEVICE: plughw:CARD=UACDemoV10,DEV=0
+RECORD_SECONDS: 6 # 兼容旧配置；VAD 模式不再按固定时长截断
+WAKE_WORD: "你好小云"
+SESSION_TIMEOUT_SECONDS: 30
+VAD_RMS_THRESHOLD: 500
+VAD_SILENCE_MS: 800
+MAX_SPEECH_SECONDS: 15
+MIC_VOLUME_PERCENT: 100
+PLAYBACK_VOLUME_PERCENT: 100
+# true：百炼流式返回文本，按句合成并播放；false：等待完整答案后一次播放
+STREAMING_RESPONSE: true
+# 单独的语气词和应答不触发对话；说“继续背诗”等完整指令。
+IGNORE_FILLER_SPEECH: true
+IGNORE_STANDALONE_ACK: true
+# 录音启动要求连续超过阈值 80ms，整段至少有 240ms 有声内容。
+VAD_START_MS: 80
+VAD_MIN_VOICED_MS: 240
+# stdio MCP 由语音助手启动，共用本配置中的 API Key。
+VISION_MCP_ENABLED: true
+VISION_IMAGE_DIR: images
+# none=关闭；file=测试图片；camera=独占 USB/V4L2；snapshot=现有视频服务接口
+VISION_SOURCE: none
+VISION_SNAPSHOT_URL: http://127.0.0.1:8080/snapshot
+VISION_SNAPSHOT_TIMEOUT_SECONDS: 8
+VISION_FRAME_FILE: test.png
+VISION_CAMERA_DEVICE: /dev/video0
+# 可使用 /dev/v4l/by-id/...-video-index0 固定链接避免插拔后编号改变。
+# 以下参数留空时由驱动选择；根据 v4l2-ctl --list-formats-ext 设置。
+VISION_CAMERA_FORMAT: ""
+VISION_CAMERA_SIZE: ""
+VISION_CAMERA_FPS: ""
+SYSTEM_PROMPT: "你是运行在 RK3566 设备上的中文语音助手。回答简洁、准确，适合用语音播放。"
+
+# ROS2 语音导航：使用 ros2-web 中命名保存的地图点位。
+NAVIGATION_MCP_ENABLED: true
+ROS2_WEB_API_URL: "http://127.0.0.1:3000/api"

@@ -1,0 +1,40 @@
+# Local credentials and per-device configuration
+/config.yaml
+/config.*.yaml
+.env
+.env.*
+*.pem
+*.key
+
+# Python / editor caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Runtime and user data; retain only the synthetic demo image
+/images/*
+!/images/mcp_test.png
+/recordings/
+/logs/
+*.wav
+*.mp3
+*.pcm
+*.log
+
+# Temporary files, archives and backups
+*.tmp
+*.bak
+*.backup
+*~
+*.zip
+*.tar
+*.tar.gz
+*.tgz

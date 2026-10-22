@@ -1,0 +1,15 @@
+[Unit]
+Description=RK3566 Voice Assistant
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/voice_assistant
+ExecStart=/usr/bin/python3 /root/voice_assistant/assistant.py --config /root/voice_assistant/config.yaml
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
