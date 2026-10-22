@@ -1,6 +1,6 @@
 # Voice Assistant Client · 小云语音助手
 
-面向 RK3566 / Armbian / Debian / Ubuntu 的 Python 中文语音助手，支持 USB 麦克风、扬声器、阿里云百炼问答、图片理解，以及通过 MCP 联动 ROS2 预设点导航。
+适用于 Linux 设备的 Python 中文语音助手，支持 USB 麦克风、扬声器、阿里云百炼问答、图片理解，以及通过 MCP 联动 ROS2 预设点导航。
 
 配置统一保存在 **`config.yaml`** 中。对话、语音识别、语音合成和图片理解共用一个具有相应模型权限的 `DASHSCOPE_API_KEY`。
 
