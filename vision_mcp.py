@@ -19,6 +19,7 @@ from assistant import AssistantError, Config, load_yaml
 from image_assistant import DEFAULT_PROMPT, VisionClient, extract_json, image_dimensions, normalize_result
 from http_transport import urlopen
 from navigation_tools import NAVIGATION_TOOLS, call_navigation
+from network_tools import NETWORK_TOOLS, get_wifi_ip
 
 
 PROTOCOL = "2025-11-25"
@@ -37,6 +38,7 @@ TOOLS = [
 ]
 
 TOOLS += NAVIGATION_TOOLS
+TOOLS += NETWORK_TOOLS
 
 class ToolError(Exception):
     def __init__(self, code, message):
@@ -184,6 +186,8 @@ class VisionService:
                 raise ToolError("INVALID_ARGUMENT", "question 不能超过 2000 个字符")
             if name in {t["name"] for t in NAVIGATION_TOOLS}:
                 result = call_navigation(self.raw, name, arguments)
+            elif name == "get_wifi_ip":
+                result = get_wifi_ip()
             elif name == "vision_status":
                 device = str(self.raw.get("VISION_CAMERA_DEVICE", "/dev/video0"))
                 try:

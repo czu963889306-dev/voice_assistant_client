@@ -209,7 +209,7 @@ class MCPTests(unittest.TestCase):
 
     def test_stdio_lifecycle_and_tool_errors(self):
         with VisionMCPClient(self.config, timeout=5) as client:
-            self.assertEqual({t['function']['name'] for t in client.tools()}, {'analyze_image', 'inspect_current_view', 'vision_status', 'list_navigation_points', 'navigate_to_point', 'cancel_navigation', 'get_navigation_status'})
+            self.assertEqual({t['function']['name'] for t in client.tools()}, {'analyze_image', 'inspect_current_view', 'vision_status', 'list_navigation_points', 'navigate_to_point', 'cancel_navigation', 'get_navigation_status', 'get_wifi_ip'})
             self.assertEqual(client.request("ping", {}), {})
             self.assertFalse(client.call("vision_status", {})["isError"])
             self.assertTrue(client.call("inspect_current_view", {})["isError"])

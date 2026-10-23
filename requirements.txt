@@ -1,2 +1,2 @@
 # Keep dependencies optional: the runtime uses Python standard library only.
-# Install ALSA utilities on Debian/Ubuntu: sudo apt-get install alsa-utils
+# Debian/Ubuntu system tools: sudo apt-get install alsa-utils iproute2

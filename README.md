@@ -12,6 +12,7 @@
 - 识别上传图片或当前摄像头画面，输出中文描述、对象矩形框和中心点的像素坐标。
 - 内置 stdio MCP 服务，提供图片识别、导航点查询、导航下发、取消导航和状态查询工具。
 - 通过配套 ros2-web 的 HTTP 接口，按已保存的点位名称下发 ROS2 导航目标。
+- 通过 MCP 实时查询并逐位播报 Wi-Fi 的 IPv4 地址，区分无线、有线和虚拟网卡。
 - 使用稳定 ALSA 声卡 ID，开机和 USB 热插拔时等待声卡就绪。
 - 提供 systemd 服务、模型配置读写工具和自动化回归测试。
 
@@ -56,7 +57,7 @@ flowchart LR
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y git python3 alsa-utils
+sudo apt-get install -y git python3 alsa-utils iproute2
 
 git clone https://github.com/czu963889306-dev/voice_assistant_client.git /root/voice_assistant
 cd /root/voice_assistant
@@ -137,6 +138,7 @@ sudo systemctl start voice-assistant
 你好小云
 你好小云，给我背一首诗
 看看当前画面有什么
+当前 Wi-Fi 的 IP 是多少
 识别图片 test.jpg，告诉我物体的位置
 有哪些导航点
 导航到A点
@@ -234,7 +236,7 @@ python3 assistant.py --text "看看当前画面有什么"
 
 直接采集时，用 `v4l2-ctl --list-devices` 确认摄像头节点，使用 `/dev/v4l/by-id/` 固定链接，并按设备能力配置格式、分辨率和帧率。已有服务占用摄像头时使用共享 snapshot 接口。
 
-## MCP 与 ROS2 导航
+## MCP 工具与 ROS2 导航
 
 启用 `VISION_MCP_ENABLED` 后，助手自动启动 `vision_mcp.py` 子进程，通过 UTF-8、按行 JSON-RPC 的 stdio 连接加载工具，无需另开 MCP 网络端口。
 
@@ -243,6 +245,7 @@ python3 assistant.py --text "看看当前画面有什么"
 | `analyze_image` | 识别指定图片或最新上传图片 |
 | `inspect_current_view` | 获取并分析当前画面 |
 | `vision_status` | 查询图片和画面来源配置，不取图 |
+| `get_wifi_ip` | 实时查询 Wi-Fi IPv4 地址，提供逐位播报文本 |
 | `list_navigation_points` | 查询 ros2-web 保存的导航点 |
 | `navigate_to_point` | 按点位名称请求下发导航目标 |
 | `cancel_navigation` | 请求停止当前导航目标 |
@@ -263,6 +266,23 @@ python3 assistant.py --text "看看当前画面有什么"
     }
   }
 }
+```
+
+### 播报 Wi-Fi IP
+
+唤醒后说“当前 Wi-Fi 的 IP 是多少”“播报一下无线网络 IP 地址”或“本机 IP 是多少”。常见问法直接调用本地 MCP 工具，不需要聊天模型生成地址；语音识别和合成仍使用原有百炼服务。
+
+`get_wifi_ip` 不接受参数，每次读取 Linux 无线网卡标记和 `iproute2` 的当前地址；有多块无线网卡时优先选择 Wi-Fi 默认路由，不会用有线、VPN、回环地址代替。工具返回 `interface`、`ipv4`、`ipv4_addresses`、`interfaces` 和 `speech_text`，其中播报文本逐位读出 IP 的数字。未发现 Wi-Fi 网卡或没有可用 IPv4 时明确报错。
+
+通过 MCP 手动检查：
+
+```bash
+python3 - <<'PY'
+import json
+from mcp_client import VisionMCPClient
+with VisionMCPClient('config.yaml') as client:
+    print(json.dumps(client.call('get_wifi_ip', {}), ensure_ascii=False, indent=2))
+PY
 ```
 
 ### 导航配置
@@ -342,6 +362,7 @@ python3 model_settings.py read /root/voice_assistant/config.yaml
 ├── vision_mcp.py             # 图片与导航 MCP 服务入口
 ├── vision_tool.py            # 图片 MCP 命令行入口
 ├── navigation_tools.py       # 导航指令解析与 ros2-web 接口适配
+├── network_tools.py          # Wi-Fi IPv4 查询、逐位播报与 MCP 工具定义
 ├── model_settings.py         # 模型配置读取、验证和原子保存
 ├── model_catalog.py          # 配套网页使用的模型与端点选项
 ├── voice-assistant.service   # systemd 服务模板
