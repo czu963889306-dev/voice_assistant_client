@@ -153,7 +153,7 @@ class Config:
     vad_min_voiced_ms: int = 240
     vision_mcp_enabled: bool = True
     config_path: str = ""
-    system_prompt: str = "你是运行在 RK3566 设备上的中文语音助手。回答简洁、准确，适合用语音播放。"
+    system_prompt: str = "你是运行在出云设备上的中文语音助手。回答简洁、准确，适合用语音播放。"
 
     @classmethod
     def from_file(cls, path: str | Path = "config.yaml") -> "Config":

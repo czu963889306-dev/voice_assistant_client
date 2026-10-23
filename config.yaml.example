@@ -59,7 +59,7 @@ VISION_CAMERA_DEVICE: /dev/video0
 VISION_CAMERA_FORMAT: ""
 VISION_CAMERA_SIZE: ""
 VISION_CAMERA_FPS: ""
-SYSTEM_PROMPT: "你是运行在 RK3566 设备上的中文语音助手。回答简洁、准确，适合用语音播放。"
+SYSTEM_PROMPT: "你是运行在出云设备上的中文语音助手。回答简洁、准确，适合用语音播放。"
 
 # ROS2 语音导航：使用 ros2-web 中命名保存的地图点位。
 NAVIGATION_MCP_ENABLED: true
