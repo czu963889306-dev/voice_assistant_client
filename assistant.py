@@ -17,6 +17,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import wave
@@ -471,6 +472,9 @@ class BailianClient:
             raise AssistantError(f"百炼流式聊天接口连接失败: {exc}") from exc
 
     def speak(self, text: str, output_path: Path) -> None:
+        text = speech_text(text)
+        if not text:
+            raise AssistantError("语音合成文本没有可朗读的文字或数字")
         payload = {
             "model": self.cfg.tts_model,
             "input": {"text": text, "voice": self.cfg.tts_voice, "format": "wav", "sample_rate": 24000},
@@ -702,6 +706,20 @@ def play_audio(cfg: Config, audio_path: Path) -> None:
         raise AssistantError(f"播放失败（设备 {cfg.output_device}）: {err.strip()}")
 
 
+def speech_text(text: str) -> str:
+    """Prepare plain speech; punctuation and formatting alone are not TTS input."""
+    text = re.sub(r"(?m)^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+)", "", text)
+    for marker in ("```", "`", "**", "__"):
+        text = text.replace(marker, "")
+    text = "".join(
+        " " if char in "\r\n\t" else char
+        for char in text
+        if char in "\r\n\t" or unicodedata.category(char) not in {"Cc", "Cf", "Cs"}
+    )
+    text = " ".join(text.split())
+    return text if any(char.isalnum() for char in text) else ""
+
+
 def sentence_chunks(fragments: Any):
     """Group streamed model fragments into short, speakable sentences."""
     buffer = ""
@@ -712,14 +730,18 @@ def sentence_chunks(fragments: Any):
         for index, char in enumerate(str(fragment)):
             # Wait for the next character before interpreting a dot: filenames
             # and decimal numbers can be split across separate SSE fragments.
-            if buffer.endswith(".") and not (char.isascii() and char.isalnum()):
-                yield buffer.strip()
+            if buffer.endswith(".") and char != "." and not (char.isascii() and char.isalnum()):
+                if speech_text(buffer):
+                    yield buffer.strip()
                 buffer = ""
             buffer += char
-            if char in boundaries and buffer.strip():
-                yield buffer.strip()
+            # Flush an ellipsis as one ending, including when its dots arrive
+            # in separate SSE deltas. The preamble can play before an MCP call.
+            if char in boundaries or buffer.endswith(("...", "……")):
+                if speech_text(buffer):
+                    yield buffer.strip()
                 buffer = ""
-    if buffer.strip():
+    if speech_text(buffer):
         yield buffer.strip()
 
 
@@ -751,13 +773,13 @@ def stream_answer_and_speak(cfg: Config, client: BailianClient, history: list[di
                 response_audio = workdir / f"response-{sequence:04d}.wav"
                 sequence += 1
                 began = time.monotonic()
-                print(f"语音合成开始（第 {sequence} 段）…", file=sys.stderr, flush=True)
+                print(f"语音合成开始（第 {sequence} 段，{len(sentence)} 字）…", file=sys.stderr, flush=True)
                 client.speak(sentence, response_audio)
                 print(f"语音合成完成：{time.monotonic() - began:.1f} 秒", file=sys.stderr, flush=True)
                 audio_queue.put(response_audio)
             except BaseException as exc:
                 worker_errors.append(exc)
-                print(f"语音合成失败：{exc}", file=sys.stderr, flush=True)
+                print(f"语音合成失败（第 {sequence} 段）：{exc}；片段={sentence[:80]!r}", file=sys.stderr, flush=True)
             finally:
                 sentence_queue.task_done()
 
@@ -790,7 +812,9 @@ def stream_answer_and_speak(cfg: Config, client: BailianClient, history: list[di
         for sentence in sentence_chunks(client.chat_stream(history)):
             pieces.append(sentence)
             print(sentence, end="", flush=True)
-            sentence_queue.put(sentence)
+            prepared = speech_text(sentence)
+            if prepared:
+                sentence_queue.put(prepared)
         answer = "".join(pieces).strip()
         print(flush=True)
         sentence_queue.put(None)

@@ -8,7 +8,7 @@
 
 - 默认通过“**你好小云**”唤醒，支持连续对话、超时休眠和“再见”结束对话。
 - 本地 VAD 判断语音起止，过滤短促噪声、单独的“嗯 / en / 对 / 好”等应答，以及部分异常点位枚举识别结果。
-- Qwen 文本流式返回，按句请求 CosyVoice 合成并依次播放。
+- Qwen 文本流式返回，按句请求 CosyVoice 合成并依次播放；省略号按整组处理，纯标点、空片段和 Markdown 装饰不会单独送去合成。
 - 识别上传图片或当前摄像头画面，输出中文描述、对象矩形框和中心点的像素坐标。
 - 内置 stdio MCP 服务，提供图片识别、导航点查询、导航下发、取消导航和状态查询工具。
 - 通过配套 ros2-web 的 HTTP 接口，按已保存的点位名称下发 ROS2 导航目标。
@@ -323,6 +323,7 @@ python3 model_settings.py read /root/voice_assistant/config.yaml
 | 图片识别提示没有来源 | 检查 `VISION_SOURCE`，确认 snapshot 接口返回有效单帧图片 |
 | 播报下发成功但未移动 | 查看 `submitted`、实际导航状态、当前地图和初始定位 |
 | 对话长时间等待 | 检查网络、端点与密钥权限，按日志区分模型、TTS、下载及播放耗时 |
+| TTS 报 `Please ensure input text is valid` | 更新到已修复省略号分段的版本；若仍报错，查看日志中的段号与输入片段 |
 | 开视频后网关延迟升高 | 排查重复网页视频连接和 MJPEG 带宽；图片 MCP 仅按需取单帧 |
 
 网络请求默认优先 IPv4，保留 IPv6 回退；可通过 `HTTP_CONNECT_TIMEOUT_SECONDS`、`HTTP_READ_TIMEOUT_SECONDS`、`TTS_TIMEOUT_SECONDS` 调整等待时间。HTTPS 证书验证保持开启。
