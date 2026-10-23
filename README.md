@@ -14,6 +14,7 @@
 - 通过配套 ros2-web 的 HTTP 接口，按已保存的点位名称下发 ROS2 导航目标。
 - 通过 MCP 实时查询并逐位播报 Wi-Fi 的 IPv4 地址，区分无线、有线和虚拟网卡。
 - 使用稳定 ALSA 声卡 ID，开机和 USB 热插拔时等待声卡就绪。
+- 服务启动时在声卡就绪后播放一次本地提示音，播完再监听唤醒词。
 - 提供 systemd 服务、模型配置读写工具和自动化回归测试。
 
 运行时仅使用 **Python 标准库**，无需第三方 Python 包。录音和播放依赖 Linux ALSA 工具。
@@ -110,6 +111,25 @@ PLAYBACK_VOLUME_PERCENT: 100
 ```
 
 `UACDemoV10` 是示例设备 ID，需要按实际硬件修改。按声卡 ID 选择设备能适应重启后的编号变化。
+
+启动提示音通过以下配置设置，文件路径相对 `config.yaml` 所在目录：
+
+将所需音频放入 `sounds/startup.wav`，音频素材不随源码提交，格式转换和当前设备的音效来源见 [sounds/README.md](sounds/README.md)。
+
+```yaml
+STARTUP_SOUND_ENABLED: true
+STARTUP_SOUND_FILE: sounds/startup.wav
+```
+
+使用 16 位 PCM WAV，支持单声道、双声道，最长 15 秒。音效在本地播放，不消耗模型额度。每次启动服务播放一次，USB 重连和每轮对话不会重复播放；文件缺失或播放失败会记录原因并继续启动。设置 `STARTUP_SOUND_ENABLED: false` 可关闭。
+
+仅测试启动音效（不录音、不调用模型），先停止后台服务，完成后恢复：
+
+```bash
+sudo systemctl stop voice-assistant
+python3 assistant.py --test-startup-sound
+sudo systemctl start voice-assistant
+```
 
 ### 4. 自检并启动
 

@@ -144,6 +144,8 @@ class Config:
     max_speech_seconds: int = 15
     mic_volume_percent: int = 100
     playback_volume_percent: int = 100
+    startup_sound_enabled: bool = True
+    startup_sound_file: str = "sounds/startup.wav"
     streaming_response: bool = True
     ignore_filler_speech: bool = True
     ignore_standalone_ack: bool = True
@@ -189,6 +191,8 @@ class Config:
             max_speech_seconds=_as_int(raw.get("MAX_SPEECH_SECONDS", cls.max_speech_seconds), cls.max_speech_seconds),
             mic_volume_percent=_as_int(raw.get("MIC_VOLUME_PERCENT", cls.mic_volume_percent), cls.mic_volume_percent),
             playback_volume_percent=_as_int(raw.get("PLAYBACK_VOLUME_PERCENT", cls.playback_volume_percent), cls.playback_volume_percent),
+            startup_sound_enabled=_as_bool(raw.get("STARTUP_SOUND_ENABLED", True), True),
+            startup_sound_file=str(raw.get("STARTUP_SOUND_FILE", cls.startup_sound_file)).strip(),
             streaming_response=_as_bool(raw.get("STREAMING_RESPONSE", cls.streaming_response), cls.streaming_response),
             ignore_filler_speech=_as_bool(raw.get("IGNORE_FILLER_SPEECH", True), True),
             ignore_standalone_ack=_as_bool(raw.get("IGNORE_STANDALONE_ACK", True), True),
@@ -715,6 +719,39 @@ def play_audio(cfg: Config, audio_path: Path) -> None:
         raise AssistantError(f"播放失败（设备 {cfg.output_device}）: {err.strip()}")
 
 
+def startup_sound_path(cfg: Config) -> Path:
+    root = Path(cfg.config_path).parent if cfg.config_path else Path(__file__).resolve().parent
+    return (root / cfg.startup_sound_file).resolve()
+
+
+def play_startup_sound(cfg: Config) -> bool:
+    """Play a short local PCM WAV before opening the microphone; never call TTS."""
+    if not cfg.startup_sound_enabled:
+        return False
+    if not cfg.startup_sound_file:
+        raise AssistantError("STARTUP_SOUND_FILE 未指定启动音效文件")
+    path = startup_sound_path(cfg)
+    try:
+        with wave.open(str(path), "rb") as wav:
+            frames, rate = wav.getnframes(), wav.getframerate()
+            if wav.getsampwidth() != 2 or wav.getnchannels() not in (1, 2):
+                raise AssistantError("启动音效需要 16 位单声道或双声道 PCM WAV 文件")
+            if rate <= 0 or not 0 < frames / rate <= 15:
+                raise AssistantError("启动音效时长需要大于 0 且不超过 15 秒")
+            expected = frames * wav.getnchannels() * wav.getsampwidth()
+            if expected > 12_000_000 or len(wav.readframes(frames)) != expected:
+                raise AssistantError("启动音效文件不完整或过大")
+    except (OSError, wave.Error, EOFError) as exc:
+        raise AssistantError(f"无法读取启动音效 {path}：{exc}") from exc
+    configure_capture(cfg)
+    print(f"播放启动提示音：{path.name}（{frames / rate:.2f} 秒）", flush=True)
+    play_audio(cfg, path)
+    # Let the speaker/reverberation settle before VAD starts capturing.
+    time.sleep(0.3)
+    print("启动提示音播放完成。", flush=True)
+    return True
+
+
 def speech_text(text: str) -> str:
     """Prepare plain speech; punctuation and formatting alone are not TTS input."""
     text = re.sub(r"(?m)^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+)", "", text)
@@ -925,6 +962,7 @@ def main() -> int:
     parser.add_argument("--text", help="直接测试文本，不录音；本地命令直接回答，否则调用聊天模型")
     parser.add_argument("--devices", action="store_true", help="列出 ALSA 录音和播放设备")
     parser.add_argument("--self-test", action="store_true", help="检查外部命令、配置和百炼参数")
+    parser.add_argument("--test-startup-sound", action="store_true", help="仅播放本地启动提示音，不录音、不请求模型")
     args = parser.parse_args()
     try:
         cfg = Config.from_file(args.config)
@@ -952,9 +990,20 @@ def main() -> int:
             "vad_silence_ms": cfg.vad_silence_ms,
             "mic_volume_percent": cfg.mic_volume_percent,
             "playback_volume_percent": cfg.playback_volume_percent,
+            "startup_sound_enabled": cfg.startup_sound_enabled,
+            "startup_sound_file": str(startup_sound_path(cfg)),
+            "startup_sound_exists": startup_sound_path(cfg).is_file(),
             "devices": list_audio_devices(),
         }, ensure_ascii=False, indent=2))
         return 0
+    if args.test_startup_sound:
+        try:
+            if not play_startup_sound(cfg):
+                print("启动提示音已在配置中关闭。")
+            return 0
+        except AssistantError as exc:
+            print(f"错误：{exc}", file=sys.stderr)
+            return 1
     if args.text:
         local = command_reply(args.text)
         if local:
@@ -995,6 +1044,7 @@ def main() -> int:
     session_active = not bool(cfg.wake_word)
     last_active = time.monotonic()
     waiting_for_audio = None
+    startup_sound_pending = True
     while not stop:
         try:
             missing = missing_audio_cards(cfg)
@@ -1007,6 +1057,15 @@ def main() -> int:
             if waiting_for_audio is not None:
                 print("声卡已就绪，恢复语音服务。", flush=True)
                 waiting_for_audio = None
+            if startup_sound_pending:
+                # Consume once even on playback failure, without blocking normal dialogue.
+                startup_sound_pending = False
+                try:
+                    play_startup_sound(cfg)
+                except AssistantError as exc:
+                    print(f"启动提示音跳过：{exc}；继续启动语音助手。", file=sys.stderr, flush=True)
+                if stop:
+                    break
             if cfg.wake_word and session_active and time.monotonic() - last_active > cfg.session_timeout_seconds:
                 session_active = False
                 print(f"{cfg.session_timeout_seconds} 秒无对话，回到等待唤醒。", flush=True)

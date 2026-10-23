@@ -31,6 +31,10 @@ VAD_SILENCE_MS: 800
 MAX_SPEECH_SECONDS: 15
 MIC_VOLUME_PERCENT: 100
 PLAYBACK_VOLUME_PERCENT: 100
+# 声卡就绪后、开始监听前播放一次；路径相对 config.yaml 所在目录。
+# 本地 16 位 PCM WAV（最长 15 秒），不使用百炼 API。
+STARTUP_SOUND_ENABLED: true
+STARTUP_SOUND_FILE: sounds/startup.wav
 # true：百炼流式返回文本，按句合成并播放；false：等待完整答案后一次播放
 STREAMING_RESPONSE: true
 # 单独的语气词和应答不触发对话；说“继续背诗”等完整指令。
