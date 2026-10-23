@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import shutil
@@ -101,13 +102,11 @@ class VisionService:
         return device
 
     def snapshot_view(self, question):
-        url = str(self.raw.get("VISION_SNAPSHOT_URL", "http://127.0.0.1:8080/snapshot"))
+        url = self.snapshot_url()
         parsed = urllib.parse.urlsplit(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-            raise ToolError("INVALID_SNAPSHOT_URL", "VISION_SNAPSHOT_URL 必须是 HTTP 或 HTTPS 图片接口地址")
         timeout = max(1, min(30, int(self.raw.get("VISION_SNAPSHOT_TIMEOUT_SECONDS", 8))))
         request = urllib.request.Request(url, headers={"Accept": "image/*", "Cache-Control": "no-cache"})
-        print("正在从 snapshot 接口获取画面…", file=sys.stderr, flush=True)
+        print(f"正在从 snapshot 接口获取画面（主机 {parsed.hostname}）…", file=sys.stderr, flush=True)
         try:
             with urlopen(request, timeout=timeout, prefer_ipv4=self.cfg.prefer_ipv4,
                          connect_timeout=self.cfg.http_connect_timeout_seconds) as response:
@@ -131,7 +130,33 @@ class VisionService:
             result = self.analyze(path, question, "snapshot")
             # This is fetch time; an HTTP endpoint cannot prove camera exposure time.
             result["fetched_at"] = fetched_at
+            result["snapshot_host"] = parsed.hostname
             return result
+
+    def snapshot_url(self):
+        """Resolve the Wi-Fi host on every request so DHCP changes are immediate."""
+        url = str(self.raw.get("VISION_SNAPSHOT_URL", "http://127.0.0.1:8080/snapshot")).strip()
+        try:
+            parsed = urllib.parse.urlsplit(url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                raise ValueError('Missing HTTP host')
+            if parsed.port is not None and not 1 <= parsed.port <= 65535:
+                raise ValueError('Invalid port')
+            if '{' in url or '}' in url:
+                remainder = url.replace('{wifi_ip}', '')
+                if (parsed.hostname != '{wifi_ip}' or url.count('{wifi_ip}') != 1
+                        or '{' in remainder or '}' in remainder):
+                    raise ValueError('Unsupported placeholder')
+                try:
+                    address = str(ipaddress.IPv4Address(get_wifi_ip()['ipv4']))
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    raise ToolError('SNAPSHOT_ADDRESS_UNAVAILABLE',
+                                    '无法解析摄像头动态地址：Wi-Fi 未连接、尚未获取 IPv4 或网络查询失败。') from exc
+                url = parsed._replace(netloc=parsed.netloc.replace('{wifi_ip}', address)).geturl()
+        except ValueError:
+            raise ToolError('INVALID_SNAPSHOT_URL',
+                            'VISION_SNAPSHOT_URL 必须是有效的 HTTP/HTTPS 地址；动态主机使用 {wifi_ip}。') from None
+        return url
 
     def current_view(self, question):
         if self.source == "snapshot":
@@ -201,6 +226,13 @@ class VisionService:
                           "capture_dependency_available": bool(shutil.which("ffmpeg")),
                           "snapshot_configured": self.source == "snapshot",
                           "current_view_configured": self.source in {"camera", "snapshot", "file"}}
+                result['snapshot_dynamic_host'] = '{wifi_ip}' in str(self.raw.get('VISION_SNAPSHOT_URL', ''))
+                if self.source == 'snapshot':
+                    try:
+                        result['snapshot_host'] = urllib.parse.urlsplit(self.snapshot_url()).hostname
+                    except ToolError as exc:
+                        result['snapshot_host'] = None
+                        result['snapshot_address_error'] = exc.code
             elif name == "analyze_image":
                 try:
                     path = self.image_path(arguments["image_path"]) if "image_path" in arguments else self.latest_image()

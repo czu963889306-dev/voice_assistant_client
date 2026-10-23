@@ -214,18 +214,20 @@ MCP 图片入口限制为 `VISION_IMAGE_DIR` 内的文件，检查符号链接�
 ```yaml
 VISION_MCP_ENABLED: true
 VISION_SOURCE: snapshot
-VISION_SNAPSHOT_URL: http://127.0.0.1:8080/snapshot
+VISION_SNAPSHOT_URL: "http://{wifi_ip}:8080/snapshot"
 VISION_SNAPSHOT_TIMEOUT_SECONDS: 8
 ```
 
-摄像头在另一台设备时，把 `127.0.0.1` 换为对应设备地址。接口必须返回单张图片，不能是 HTML 页面或 MJPEG 连续视频流。
+`{wifi_ip}` 会在每次取图前重新解析为助手所在设备当前的 Wi-Fi IPv4，DHCP 地址变化后无需修改配置或重启服务。未连接 Wi-Fi 或没有 IPv4 时会明确报错，不会继续使用旧地址。
+
+摄像头和助手在同一设备时，也可使用 `http://127.0.0.1:8080/snapshot`，不依赖局域网地址。摄像头在另一台设备时，填写摄像头设备自己的地址或可解析的主机名；`{wifi_ip}` 表示助手所在设备的 Wi-Fi 地址。接口必须返回单张图片，不能是 HTML 页面或 MJPEG 连续视频流。
 
 ```bash
 python3 vision_tool.py --current
 python3 assistant.py --text "看看当前画面有什么"
 ```
 
-每次识别都会重新取图，结果标注 `source_kind: snapshot` 和 `fetched_at`；后者是获取时间，不是摄像头曝光时间。取图失败会报错，识别后的临时图片会清理。此模式无需 ffmpeg，也无需语音助手直接占用摄像头。
+每次识别都会重新取图，结果标注 `source_kind: snapshot`、`snapshot_host` 和 `fetched_at`；后者是获取时间，不是摄像头曝光时间。取图失败会报错，识别后的临时图片会清理。此模式无需 ffmpeg，也无需语音助手直接占用摄像头。
 
 | `VISION_SOURCE` | 用途 |
 | --- | --- |
